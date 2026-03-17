@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#080c10">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PhoneTrace">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="manifest.json">
+  <title>PhoneTrace</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;600;700&display=swap');
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+    :root{--bg:#080c10;--acc:#00aaff;--text:#c8d8e8;--dim:#5a7a8a;--safe:#00cc88;--warn:#ffaa00;--danger:#ff4444}
+    html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;overscroll-behavior:none}
+
+    .shell{display:flex;flex-direction:column;height:100vh;height:100dvh;position:relative}
+
+    /* TOP PANEL */
+    .top{flex-shrink:0;background:radial-gradient(ellipse at 20% 0%,#0d1f2d 0%,var(--bg) 70%);
+      padding:20px 16px 14px;position:relative;z-index:10;
+      border-bottom:1px solid rgba(0,170,255,0.12)}
+    .top::before{content:'';position:absolute;inset:0;pointer-events:none;
+      background-image:linear-gradient(rgba(0,180,255,0.025) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(0,180,255,0.025) 1px,transparent 1px);
+      background-size:30px 30px}
+    .hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;position:relative;z-index:1}
+    .eyebrow{font-family:'Share Tech Mono',monospace;font-size:8px;letter-spacing:3px;color:var(--acc);opacity:.7;text-transform:uppercase}
+    .title{font-size:22px;font-weight:700;letter-spacing:-.5px;color:#e8f4ff}
+    .title span{color:var(--acc)}
+    .sdot{width:8px;height:8px;border-radius:50%;background:var(--safe);box-shadow:0 0 6px var(--safe);animation:blink 2s ease-in-out infinite}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+    .srow{display:flex;gap:10px;position:relative;z-index:1}
+    .phw{flex:1;position:relative}
+    .phi{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:14px}
+    .ph{width:100%;background:rgba(0,0,0,.5);border:1px solid rgba(0,170,255,.2);border-radius:4px;
+      padding:12px 12px 12px 34px;font-family:'Share Tech Mono',monospace;font-size:15px;
+      color:#e8f4ff;letter-spacing:1.5px;outline:none;transition:border-color .2s;-webkit-appearance:none}
+    .ph::placeholder{color:#1e3a4a}
+    .ph:focus{border-color:var(--acc);box-shadow:0 0 0 2px rgba(0,170,255,.1)}
+    .tbtn{background:var(--acc);border:none;border-radius:4px;padding:12px 16px;color:#080c10;
+      font-family:'Barlow',sans-serif;font-size:12px;font-weight:700;letter-spacing:1.5px;
+      text-transform:uppercase;cursor:pointer;touch-action:manipulation;transition:opacity .15s;white-space:nowrap}
+    .tbtn:active{opacity:.8}
+    .tbtn:disabled{background:#1a3a4a;color:#2a5a6a}
+
+    .hrow{display:flex;gap:8px;margin-top:10px;overflow-x:auto;padding-bottom:2px;position:relative;z-index:1}
+    .hrow::-webkit-scrollbar{display:none}
+    .hchip{flex-shrink:0;background:rgba(0,0,0,.4);border:1px solid rgba(0,170,255,.12);border-radius:20px;
+      padding:5px 12px;font-family:'Share Tech Mono',monospace;font-size:11px;color:#5a8a9a;
+      cursor:pointer;touch-action:manipulation;display:flex;align-items:center;gap:6px}
+    .hchip:active{border-color:rgba(0,170,255,.3)}
+    .hdot{width:5px;height:5px;border-radius:50%}
+
+    /* MAP */
+    .mapw{flex:1;position:relative;min-height:0}
+    #map{width:100%;height:100%}
+    .leaflet-tile{filter:brightness(.45) saturate(.5) hue-rotate(190deg)}
+    .leaflet-container{background:#080c10}
+    .leaflet-control-zoom a{background:rgba(8,12,16,.9)!important;color:var(--acc)!important;border-color:rgba(0,170,255,.2)!important;font-family:'Share Tech Mono',monospace!important}
+    .leaflet-control-attribution{display:none!important}
+    .mscans{position:absolute;inset:0;z-index:500;pointer-events:none;
+      background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.07) 2px,rgba(0,0,0,.07) 4px)}
+    .mvig{position:absolute;inset:0;z-index:501;pointer-events:none;
+      background:radial-gradient(ellipse at center,transparent 45%,rgba(8,12,16,.75) 100%)}
+    .mcorner{position:absolute;z-index:502;width:18px;height:18px;pointer-events:none}
+    .mcorner.tl{top:10px;left:10px;border-top:2px solid var(--acc);border-left:2px solid var(--acc)}
+    .mcorner.tr{top:10px;right:10px;border-top:2px solid var(--acc);border-right:2px solid var(--acc)}
+    .mcorner.bl{bottom:56px;left:10px;border-bottom:2px solid var(--acc);border-left:2px solid var(--acc)}
+    .mcorner.br{bottom:56px;right:10px;border-bottom:2px solid var(--acc);border-right:2px solid var(--acc)}
+    .mlabel{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:802;
+      font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:3px;
+      color:rgba(0,170,255,.45);text-transform:uppercase;pointer-events:none;white-space:nowrap}
+
+    /* Idle overlay */
+    .midle{position:absolute;inset:0;z-index:803;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;gap:10px;pointer-events:none;
+      background:rgba(8,12,16,.55)}
+    .midle .mi{font-size:30px;opacity:.2}
+    .midle .mt{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;color:#1a3a4a;text-transform:uppercase}
+
+    /* Location card */
+    .movl{position:absolute;bottom:16px;left:16px;right:16px;z-index:800;pointer-events:none}
+    .lcard{background:rgba(8,12,16,.9);border:1px solid rgba(0,170,255,.25);border-radius:6px;
+      padding:12px 14px;backdrop-filter:blur(14px);pointer-events:all;animation:slideUp .4s ease}
+    @keyframes slideUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .lrow{display:flex;align-items:center;gap:10px}
+    .lpin{font-size:16px;flex-shrink:0}
+    .lplace{font-size:14px;font-weight:600;color:#e8f4ff;flex:1}
+    .lmeta{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:.8px;margin-top:3px}
+    .lcoord{font-family:'Share Tech Mono',monospace;font-size:8px;color:rgba(0,170,255,.45);margin-top:2px}
+
+    /* DRAWER */
+    .drawer{position:absolute;bottom:0;left:0;right:0;z-index:900;max-height:72vh;
+      background:rgba(8,12,16,.97);border-top:1px solid rgba(0,170,255,.2);
+      border-radius:16px 16px 0 0;padding:0 16px 24px;overflow-y:auto;
+      transform:translateY(100%);transition:transform .4s cubic-bezier(.16,1,.3,1);
+      backdrop-filter:blur(18px)}
+    .drawer.open{transform:translateY(0)}
+    .dhandle{width:36px;height:4px;border-radius:2px;background:rgba(0,170,255,.25);
+      margin:12px auto 16px;cursor:pointer}
+
+    /* Loading */
+    .lwrap{padding:20px 0;text-align:center}
+    .spin{width:26px;height:26px;border:2px solid rgba(0,170,255,.15);border-top-color:var(--acc);
+      border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 10px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .ltxt{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--acc);
+      text-transform:uppercase;animation:pulse 1.5s ease-in-out infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+    .steps{margin-top:12px}
+    .step{display:flex;align-items:center;gap:8px;font-family:'Share Tech Mono',monospace;
+      font-size:10px;color:#1e3a4a;padding:3px 0;transition:color .3s}
+    .step.active{color:#4a8a9a}
+    .step.done{color:var(--acc)}
+    .sdott{width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
+
+    /* Result blocks */
+    .rthdr{margin-bottom:12px}
+    .rtrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+    .rtnum{font-family:'Share Tech Mono',monospace;font-size:15px;color:#d8eaf0}
+    .rbadge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:2px;
+      font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px;text-transform:uppercase}
+    .rlow{background:rgba(0,204,136,.12);color:var(--safe);border:1px solid rgba(0,204,136,.25)}
+    .rmed{background:rgba(255,170,0,.1);color:var(--warn);border:1px solid rgba(255,170,0,.25)}
+    .rhigh{background:rgba(255,68,68,.1);color:var(--danger);border:1px solid rgba(255,68,68,.25)}
+    .runk{background:rgba(90,130,150,.1);color:#5a8a9a;border:1px solid rgba(90,130,150,.25)}
+    .blk{background:rgba(0,0,0,.3);border:1px solid rgba(0,170,255,.08);
+      border-left:2px solid var(--acc);border-radius:4px;padding:12px 14px;margin-bottom:10px}
+    .blk.bw{border-left-color:var(--warn)}
+    .blk.bd{border-left-color:var(--danger)}
+    .blk.bs{border-left-color:var(--safe)}
+    .bttl{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px;
+      color:#d8eaf0;text-transform:uppercase;margin-bottom:6px}
+    .btxt{font-size:13px;line-height:1.7;color:#8aaabb;font-weight:300;white-space:pre-wrap}
+    .cbtn{width:100%;background:transparent;border:1px solid rgba(0,170,255,.2);border-radius:4px;
+      padding:10px;color:var(--acc);font-family:'Share Tech Mono',monospace;
+      font-size:10px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;
+      margin-top:4px;touch-action:manipulation}
+    .cbtn:active{background:rgba(0,170,255,.06)}
+
+    /* Error */
+    .ecard{background:rgba(255,68,68,.06);border:1px solid rgba(255,68,68,.2);
+      border-radius:6px;padding:18px;text-align:center;margin:6px 0}
+    .etitle{color:#ff6666;font-size:13px;margin-bottom:4px}
+    .esub{color:#5a3a3a;font-size:10px;font-family:'Share Tech Mono',monospace}
+
+    /* Install */
+    .ibanner{display:none;background:rgba(0,170,255,.07);border:1px solid rgba(0,170,255,.18);
+      border-radius:4px;padding:10px 14px;align-items:center;gap:10px;margin-bottom:10px;
+      position:relative;z-index:1}
+    .ibanner.show{display:flex}
+    .ibtxt{flex:1;font-size:12px;color:#a8c0cc}
+    .ibbtn{background:var(--acc);border:none;border-radius:3px;padding:6px 12px;color:#080c10;font-size:11px;font-weight:700;cursor:pointer}
+    .ibx{background:none;border:none;color:#2a4a5a;font-size:16px;cursor:pointer}
+  </style>
+</head>
+<body>
+<div class="shell">
+  <div class="top">
+    <div class="hdr">
+      <div>
+        <div class="eyebrow">// signal intelligence</div>
+        <div class="title">PHONE<span>TRACE</span></div>
+      </div>
+      <div class="sdot"></div>
+    </div>
+    <div class="ibanner" id="ib">
+      <div class="ibtxt">📱 Install as app — Add to Home Screen</div>
+      <button class="ibbtn" id="instBtn">Install</button>
+      <button class="ibx" id="instX">✕</button>
+    </div>
+    <div class="srow">
+      <div class="phw">
+        <span class="phi">📞</span>
+        <input class="ph" id="pi" type="tel" placeholder="(555) 000-0000" inputmode="tel"/>
+      </div>
+      <button class="tbtn" id="tb" disabled>▶ TRACE</button>
+    </div>
+    <div class="hrow" id="hr"></div>
+  </div>
+
+  <div class="mapw">
+    <div id="map"></div>
+    <div class="mscans"></div>
+    <div class="mvig"></div>
+    <div class="mcorner tl"></div>
+    <div class="mcorner tr"></div>
+    <div class="mcorner bl"></div>
+    <div class="mcorner br"></div>
+    <div class="mlabel" id="ml">// AWAITING TARGET</div>
+    <div class="midle" id="mi">
+      <div class="mi">🛰️</div>
+      <div class="mt">Enter a number to trace</div>
+    </div>
+    <div class="movl">
+      <div class="lcard" id="lc" style="display:none"></div>
+    </div>
+    <div class="drawer" id="drw">
+      <div class="dhandle" id="dh"></div>
+      <div id="dc"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const STEPS=['Initializing query...','Searching public databases...','Cross-referencing spam reports...','Resolving geolocation...','Compiling intel report...'];
+const SYS=`You are a phone number intelligence analyst. Research the given number and return ONLY a valid JSON object (no markdown, no code fences):
+{
+  "riskLevel": "low"|"medium"|"high"|"unknown",
+  "summary": "2-3 sentence plain English summary",
+  "location": {
+    "city": "City or null",
+    "state": "State/Province or null",
+    "country": "Country name",
+    "countryCode": "US",
+    "lat": 37.7749,
+    "lng": -122.4194,
+    "confidence": "high"|"medium"|"low",
+    "source": "area code / carrier / NANP / etc"
+  },
+  "sections": [
+    {"title":"Identity","content":"Who owns this number..."},
+    {"title":"Reports","content":"Spam/scam reports from users..."},
+    {"title":"Carrier Info","content":"Carrier, line type, registration..."}
+  ],
+  "recommendations": "Answer / Ignore / Block and why"
+}
+US numbers: use area code city/state for lat/lng. Always include best-guess coordinates even if confidence is low. Search thoroughly for spam/scam alerts. Return ONLY the JSON.`;
+
+let hist=[];
+try{hist=JSON.parse(localStorage.getItem('pt_h')||'[]')}catch{}
+let map,marker,stTimer,deferred=null;
+
+// Map init
+map=L.map('map',{zoomControl:true,attributionControl:false,preferCanvas:true}).setView([39.5,-98.35],4);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:18,subdomains:'abcd'}).addTo(map);
+
+// DOM
+const pi=document.getElementById('pi'),tb=document.getElementById('tb');
+const drw=document.getElementById('drw'),dc=document.getElementById('dc');
+const dh=document.getElementById('dh'),lc=document.getElementById('lc');
+const mi=document.getElementById('mi'),ml=document.getElementById('ml');
+const hr=document.getElementById('hr');
+
+// Phone format
+function fmt(v){const d=v.replace(/\D/g,'').slice(0,11);if(!d.length)return '';if(d.length<=3)return`(${d}`;if(d.length<=6)return`(${d.slice(0,3)}) ${d.slice(3)}`;if(d.length<=10)return`(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`;return`+${d[0]} (${d.slice(1,4)}) ${d.slice(4,7)}-${d.slice(7)}`}
+
+pi.addEventListener('input',()=>{pi.value=fmt(pi.value);tb.disabled=pi.value.replace(/\D/g,'').length<7});
+pi.addEventListener('keydown',e=>{if(e.key==='Enter')tb.click()});
+tb.addEventListener('click',doTrace);
+dh.addEventListener('click',()=>drw.classList.remove('open'));
+
+// Risk helpers
+function rc(r){return{low:'#00cc88',medium:'#ffaa00',high:'#ff4444',unknown:'#5a8a9a'}[r]||'#5a8a9a'}
+function rbc(r){return{low:'bs',medium:'bw',high:'bd',unknown:''}[r]||''}
+function rbadge(r){return`rbadge r${r||'unk'}`}
+function badgeEl(r){const m={low:'rlow',med:'rmed',high:'rhigh',unk:'runk'};const k={low:'rlow',medium:'rmed',high:'rhigh',unknown:'runk'}[r]||'runk';return`<span class="rbadge ${k}">● ${r||'unknown'}</span>`}
+
+// Pulse marker
+function pulseIcon(color){
+  const s=`<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44">
+    <circle cx="22" cy="22" r="5" fill="${color}" opacity=".95"/>
+    <circle cx="22" cy="22" r="5" fill="none" stroke="${color}" stroke-width="1.5" opacity=".8"><animate attributeName="r" from="5" to="20" dur="1.8s" repeatCount="indefinite"/><animate attributeName="opacity" from=".8" to="0" dur="1.8s" repeatCount="indefinite"/></circle>
+    <circle cx="22" cy="22" r="5" fill="none" stroke="${color}" stroke-width="1" opacity=".5"><animate attributeName="r" from="5" to="20" dur="1.8s" begin=".6s" repeatCount="indefinite"/><animate attributeName="opacity" from=".5" to="0" dur="1.8s" begin=".6s" repeatCount="indefinite"/></circle>
+    <circle cx="22" cy="22" r="5" fill="none" stroke="${color}" stroke-width="1" opacity=".3"><animate attributeName="r" from="5" to="20" dur="1.8s" begin="1.2s" repeatCount="indefinite"/><animate attributeName="opacity" from=".3" to="0" dur="1.8s" begin="1.2s" repeatCount="indefinite"/></circle>
+  </svg>`;
+  return L.divIcon({html:s,className:'',iconSize:[44,44],iconAnchor:[22,22]});
+}
+
+// Place marker
+function placeMarker(loc,risk){
+  if(marker)map.removeLayer(marker);
+  const color=rc(risk);
+  marker=L.marker([loc.lat,loc.lng],{icon:pulseIcon(color)}).addTo(map);
+  const zoom=loc.confidence==='high'?11:loc.confidence==='medium'?7:5;
+  map.flyTo([loc.lat,loc.lng],zoom,{duration:1.5,easeLinearity:.25});
+  const parts=[loc.city,loc.state,loc.country].filter(Boolean);
+  const place=parts.join(', ')||'Unknown';
+  lc.style.display='block';
+  lc.innerHTML=`<div class="lrow">
+    <span class="lpin">📍</span>
+    <div style="flex:1">
+      <div class="lplace">${place}</div>
+      <div class="lmeta">Confidence: ${loc.confidence||'?'} · ${loc.source||'area code'}</div>
+      <div class="lcoord">${loc.lat.toFixed(4)}° N  ${Math.abs(loc.lng).toFixed(4)}° ${loc.lng<0?'W':'E'}</div>
+    </div>
+    ${badgeEl(risk)}
+  </div>`;
+  mi.style.display='none';
+}
+
+// Loading
+function showLoad(){
+  let si=0;
+  drw.classList.add('open');
+  dc.innerHTML=`<div class="lwrap"><div class="spin"></div><div class="ltxt">Tracing...</div>
+    <div class="steps">${STEPS.map((s,i)=>`<div class="step" id="st${i}"><div class="sdott"></div>${s}</div>`).join('')}</div></div>`;
+  document.getElementById('st0').className='step active';
+  stTimer=setInterval(()=>{
+    si++;
+    if(si<STEPS.length){
+      const p=document.getElementById(`st${si-1}`);const c=document.getElementById(`st${si}`);
+      if(p)p.className='step done';if(c)c.className='step active';
+    }
+  },1200);
+}
+
+// Show result
+function showResult(data,number){
+  const secs=(data.sections||[]).map(s=>`<div class="blk"><div class="bttl">${s.title}</div><div class="btxt">${s.content}</div></div>`).join('');
+  const bc=rbc(data.riskLevel);
+  dc.innerHTML=`<div class="rthdr">
+    <div class="rtrow"><span class="rtnum">${number}</span>${badgeEl(data.riskLevel)}</div>
+  </div>
+  <div class="blk ${bc}"><div class="btxt">${data.summary}</div></div>
+  ${secs}
+  ${data.recommendations?`<div class="blk"><div class="bttl">Recommendation</div><div class="btxt">${data.recommendations}</div></div>`:''}
+  <button class="cbtn" id="cb">↓ Collapse</button>`;
+  document.getElementById('cb').addEventListener('click',()=>drw.classList.remove('open'));
+}
+
+function showErr(msg){
+  dc.innerHTML=`<div class="ecard"><div class="etitle">Trace failed</div><div class="esub">${msg}</div></div>
+    <button class="cbtn" id="cb" style="margin-top:10px">↓ Close</button>`;
+  document.getElementById('cb').addEventListener('click',()=>drw.classList.remove('open'));
+}
+
+function parseResult(text){
+  try{const c=text.replace(/```json|```/g,'').trim();return JSON.parse(c)}
+  catch{return{riskLevel:'unknown',summary:text,sections:[],recommendations:'',location:null}}
+}
+
+// History
+function renderHist(){
+  if(!hist.length){hr.innerHTML='';return}
+  hr.innerHTML=hist.map((h,i)=>`<div class="hchip" data-i="${i}"><div class="hdot" style="background:${rc(h.result.riskLevel)}"></div>${h.number}</div>`).join('');
+  hr.querySelectorAll('.hchip').forEach(el=>{
+    el.addEventListener('click',()=>{
+      const e=hist[+el.dataset.i];
+      pi.value=e.number;
+      showResult(e.result,e.number);
+      drw.classList.add('open');
+      if(e.result.location?.lat)placeMarker(e.result.location,e.result.riskLevel);
+    });
+  });
+}
+
+// Main trace
+async function doTrace(){
+  const number=pi.value.trim();if(!number)return;
+  tb.disabled=true;
+  ml.textContent=`// SCANNING ${number}...`;
+  showLoad();
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',max_tokens:1000,system:SYS,
+        tools:[{type:'web_search_20250305',name:'web_search'}],
+        messages:[{role:'user',content:`Research and geolocate this phone number: ${number}`}]
+      })
+    });
+    const data=await res.json();
+    clearInterval(stTimer);
+    if(!res.ok)throw new Error(data.error?.message||'API error');
+    const tb2=data.content?.find(b=>b.type==='text');
+    if(!tb2)throw new Error('No response received');
+    const parsed=parseResult(tb2.text);
+    if(parsed.location?.lat&&parsed.location?.lng){
+      placeMarker(parsed.location,parsed.riskLevel);
+      ml.textContent=`// ${number} — LOCATED`;
+    } else {
+      ml.textContent=`// ${number} — NO LOCATION DATA`;
+    }
+    showResult(parsed,number);
+    const entry={number,time:new Date().toLocaleTimeString(),result:parsed};
+    hist=[entry,...hist.slice(0,4)];
+    try{localStorage.setItem('pt_h',JSON.stringify(hist))}catch{}
+    renderHist();
+  }catch(err){
+    clearInterval(stTimer);
+    showErr(err.message);
+    ml.textContent='// TRACE FAILED';
+  }
+  tb.disabled=false;
+}
+
+// Install PWA
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault();deferred=e;
+  document.getElementById('ib').classList.add('show');
+});
+document.getElementById('instBtn').addEventListener('click',async()=>{
+  if(!deferred)return;deferred.prompt();deferred=null;
+  document.getElementById('ib').classList.remove('show');
+});
+document.getElementById('instX').addEventListener('click',()=>document.getElementById('ib').classList.remove('show'));
+
+renderHist();
+if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>
