@@ -351,14 +351,85 @@ function renderHist(){
   });
 }
 
+// ── WORKER URL CONFIG ──
+// Paste your Cloudflare Worker URL here after deploying worker.js
+const DEFAULT_WORKER = 'REPLACE_WITH_YOUR_WORKER_URL';
+
+function getWorkerUrl(){
+  return localStorage.getItem('pt_worker') || DEFAULT_WORKER;
+}
+
+function showConfigBanner(){
+  const existing = document.getElementById('cfgBanner');
+  if(existing) return;
+  const banner = document.createElement('div');
+  banner.id = 'cfgBanner';
+  banner.style.cssText = `position:fixed;inset:0;z-index:9999;background:rgba(8,12,16,.97);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:24px;font-family:'Barlow',sans-serif;`;
+  banner.innerHTML = `
+    <div style="max-width:420px;width:100%;text-align:center">
+      <div style="font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:3px;color:#00aaff;margin-bottom:8px">// SETUP REQUIRED</div>
+      <div style="font-size:22px;font-weight:700;color:#e8f4ff;margin-bottom:8px">Connect Your Worker</div>
+      <div style="font-size:13px;color:#5a7a8a;margin-bottom:24px;line-height:1.6">
+        A Cloudflare Worker proxy is required to call the Anthropic API securely from the browser.
+        <br><br>
+        See <strong style="color:#a8c0cc">cloudflare-worker/worker.js</strong> in the ZIP for setup instructions (5 min, free).
+      </div>
+      <div style="font-size:11px;color:#00aaff;margin-bottom:8px;font-family:'Share Tech Mono',monospace;text-align:left">YOUR WORKER URL</div>
+      <input id="wuInput" type="url" placeholder="https://phonetrace-proxy.YOUR_NAME.workers.dev"
+        style="width:100%;background:rgba(0,0,0,.5);border:1px solid rgba(0,170,255,.3);border-radius:4px;
+          padding:12px;font-family:'Share Tech Mono',monospace;font-size:13px;color:#e8f4ff;
+          outline:none;margin-bottom:12px;letter-spacing:.5px"/>
+      <button id="wuSave"
+        style="width:100%;background:#00aaff;border:none;border-radius:4px;padding:13px;
+          color:#080c10;font-family:'Barlow',sans-serif;font-size:13px;font-weight:700;
+          letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;margin-bottom:10px">
+        Save &amp; Continue
+      </button>
+      <a href="https://workers.cloudflare.com" target="_blank"
+        style="font-size:11px;color:#2a5a7a;font-family:'Share Tech Mono',monospace;
+          text-decoration:none;letter-spacing:1px">
+        → Get free Cloudflare Workers account
+      </a>
+    </div>`;
+  document.body.appendChild(banner);
+  document.getElementById('wuSave').addEventListener('click', ()=>{
+    const val = document.getElementById('wuInput').value.trim();
+    if(!val || !val.startsWith('http')) return;
+    localStorage.setItem('pt_worker', val);
+    banner.remove();
+  });
+  // Pre-fill if already saved
+  const saved = localStorage.getItem('pt_worker');
+  if(saved) document.getElementById('wuInput').value = saved;
+}
+
+// Check on load — show config if URL not set
+window.addEventListener('DOMContentLoaded', ()=>{
+  const w = getWorkerUrl();
+  if(!w || w === DEFAULT_WORKER || !w.startsWith('http')) {
+    showConfigBanner();
+  }
+});
+
+// Settings gear — long-press trace btn to reconfigure
+let holdTimer;
+tb.addEventListener('touchstart', ()=>{ holdTimer = setTimeout(()=>{ showConfigBanner(); }, 1500); });
+tb.addEventListener('touchend', ()=>clearTimeout(holdTimer));
+
 // Main trace
 async function doTrace(){
   const number=pi.value.trim();if(!number)return;
+  const workerUrl = getWorkerUrl();
+  if(!workerUrl || workerUrl === DEFAULT_WORKER || !workerUrl.startsWith('http')){
+    showConfigBanner(); return;
+  }
   tb.disabled=true;
   ml.textContent=`// SCANNING ${number}...`;
   showLoad();
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
+    const res=await fetch(workerUrl,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
