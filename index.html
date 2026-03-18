@@ -351,98 +351,178 @@ function renderHist(){
   });
 }
 
-// ── WORKER URL CONFIG ──
-// Paste your Cloudflare Worker URL here after deploying worker.js
-const DEFAULT_WORKER = 'REPLACE_WITH_YOUR_WORKER_URL';
+// ── WORKER CONFIG ──
+const DEFAULT_WORKER = 'NOT_SET';
 
-function getWorkerUrl(){
-  return localStorage.getItem('pt_worker') || DEFAULT_WORKER;
-}
+function getWorkerUrl(){ return localStorage.getItem('pt_worker') || DEFAULT_WORKER; }
+function isConfigured(){ const w=getWorkerUrl(); return w && w !== DEFAULT_WORKER && w.startsWith('http'); }
 
-function showConfigBanner(){
+function showConfigBanner(errorMsg){
   const existing = document.getElementById('cfgBanner');
-  if(existing) return;
+  if(existing) existing.remove();
   const banner = document.createElement('div');
   banner.id = 'cfgBanner';
-  banner.style.cssText = `position:fixed;inset:0;z-index:9999;background:rgba(8,12,16,.97);
+  banner.style.cssText = `position:fixed;inset:0;z-index:9999;background:rgba(8,12,16,.98);
     display:flex;flex-direction:column;align-items:center;justify-content:center;
-    padding:24px;font-family:'Barlow',sans-serif;`;
-  banner.innerHTML = `
-    <div style="max-width:420px;width:100%;text-align:center">
-      <div style="font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:3px;color:#00aaff;margin-bottom:8px">// SETUP REQUIRED</div>
-      <div style="font-size:22px;font-weight:700;color:#e8f4ff;margin-bottom:8px">Connect Your Worker</div>
-      <div style="font-size:13px;color:#5a7a8a;margin-bottom:24px;line-height:1.6">
-        A Cloudflare Worker proxy is required to call the Anthropic API securely from the browser.
-        <br><br>
-        See <strong style="color:#a8c0cc">cloudflare-worker/worker.js</strong> in the ZIP for setup instructions (5 min, free).
+    padding:24px;font-family:'Barlow',sans-serif;overflow-y:auto;`;
+
+  const errHtml = errorMsg ? `
+    <div style="background:rgba(255,68,68,.08);border:1px solid rgba(255,68,68,.25);border-radius:6px;
+      padding:12px 14px;margin-bottom:20px;text-align:left;width:100%">
+      <div style="color:#ff6666;font-size:12px;font-weight:600;margin-bottom:4px">⚠ Error: ${errorMsg}</div>
+      <div style="color:#5a3535;font-size:11px;font-family:'Share Tech Mono',monospace;line-height:1.6">
+        Common causes:<br>
+        • Worker not deployed yet<br>
+        • ANTHROPIC_API_KEY not added to Worker Variables<br>
+        • Wrong URL pasted below
       </div>
-      <div style="font-size:11px;color:#00aaff;margin-bottom:8px;font-family:'Share Tech Mono',monospace;text-align:left">YOUR WORKER URL</div>
-      <input id="wuInput" type="url" placeholder="https://phonetrace-proxy.YOUR_NAME.workers.dev"
-        style="width:100%;background:rgba(0,0,0,.5);border:1px solid rgba(0,170,255,.3);border-radius:4px;
-          padding:12px;font-family:'Share Tech Mono',monospace;font-size:13px;color:#e8f4ff;
-          outline:none;margin-bottom:12px;letter-spacing:.5px"/>
+    </div>` : '';
+
+  banner.innerHTML = `
+    <div style="max-width:440px;width:100%">
+      <div style="text-align:center;margin-bottom:24px">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:3px;color:#00aaff;margin-bottom:8px">// ONE-TIME SETUP</div>
+        <div style="font-size:24px;font-weight:700;color:#e8f4ff;margin-bottom:6px">Connect Worker</div>
+        <div style="font-size:13px;color:#4a6a7a;line-height:1.5">Anthropic blocks direct browser requests.<br>A free Cloudflare Worker proxy is required.</div>
+      </div>
+
+      ${errHtml}
+
+      <div style="background:rgba(0,0,0,.4);border:1px solid rgba(0,170,255,.12);border-radius:6px;padding:16px;margin-bottom:16px">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px;color:#00aaff;margin-bottom:12px">STEP 1 — DEPLOY WORKER</div>
+        <div style="font-size:12px;color:#7a9aaa;line-height:1.8">
+          1. Go to <a href="https://workers.cloudflare.com" target="_blank" style="color:#00aaff">workers.cloudflare.com</a> → free account<br>
+          2. Create Worker → paste <strong style="color:#c8d8e8">worker.js</strong> from the ZIP → Deploy<br>
+          3. Settings → Variables → add <strong style="color:#c8d8e8">ANTHROPIC_API_KEY</strong><br>
+          &nbsp;&nbsp;&nbsp;(get key at <a href="https://console.anthropic.com" target="_blank" style="color:#00aaff">console.anthropic.com</a>)<br>
+          4. Copy your worker URL below
+        </div>
+      </div>
+
+      <div style="font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px;color:#00aaff;margin-bottom:6px">STEP 2 — PASTE WORKER URL</div>
+      <input id="wuInput" type="url"
+        placeholder="https://phonetrace-proxy.YOUR_NAME.workers.dev"
+        style="width:100%;background:rgba(0,0,0,.6);border:1px solid rgba(0,170,255,.3);
+          border-radius:4px;padding:14px;font-family:'Share Tech Mono',monospace;
+          font-size:13px;color:#e8f4ff;outline:none;margin-bottom:4px;
+          letter-spacing:.5px;-webkit-appearance:none"/>
+      <div id="wuErr" style="font-size:11px;color:#ff6666;min-height:16px;margin-bottom:12px;font-family:'Share Tech Mono',monospace"></div>
       <button id="wuSave"
-        style="width:100%;background:#00aaff;border:none;border-radius:4px;padding:13px;
+        style="width:100%;background:#00aaff;border:none;border-radius:4px;padding:14px;
           color:#080c10;font-family:'Barlow',sans-serif;font-size:13px;font-weight:700;
-          letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;margin-bottom:10px">
-        Save &amp; Continue
+          letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;touch-action:manipulation">
+        Save &amp; Test Connection
       </button>
-      <a href="https://workers.cloudflare.com" target="_blank"
-        style="font-size:11px;color:#2a5a7a;font-family:'Share Tech Mono',monospace;
-          text-decoration:none;letter-spacing:1px">
-        → Get free Cloudflare Workers account
-      </a>
+      <div id="wuStatus" style="margin-top:10px;min-height:20px;text-align:center;
+        font-family:'Share Tech Mono',monospace;font-size:10px;color:#5a8a9a"></div>
     </div>`;
+
   document.body.appendChild(banner);
-  document.getElementById('wuSave').addEventListener('click', ()=>{
-    const val = document.getElementById('wuInput').value.trim();
-    if(!val || !val.startsWith('http')) return;
-    localStorage.setItem('pt_worker', val);
-    banner.remove();
-  });
-  // Pre-fill if already saved
+
+  const inp = document.getElementById('wuInput');
   const saved = localStorage.getItem('pt_worker');
-  if(saved) document.getElementById('wuInput').value = saved;
+  if(saved && saved !== DEFAULT_WORKER) inp.value = saved;
+
+  document.getElementById('wuSave').addEventListener('click', async ()=>{
+    const val = inp.value.trim().replace(/\/$/, '');
+    const errEl = document.getElementById('wuErr');
+    const status = document.getElementById('wuStatus');
+    if(!val){ errEl.textContent='Please enter a URL'; return; }
+    if(!val.startsWith('https://')){ errEl.textContent='URL must start with https://'; return; }
+    errEl.textContent='';
+    status.textContent='Testing connection...';
+    status.style.color='#5a8a9a';
+    // Quick ping test
+    try{
+      const r = await fetch(val, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:5,messages:[{role:'user',content:'hi'}]})
+      });
+      if(r.status === 200 || r.status === 400 || r.status === 401 || r.status === 529){
+        // Any response from the worker means it's reachable
+        status.textContent='✓ Worker reachable — saving...';
+        status.style.color='#00cc88';
+        localStorage.setItem('pt_worker', val);
+        setTimeout(()=>banner.remove(), 800);
+      } else {
+        const d = await r.json().catch(()=>({}));
+        status.textContent='Worker responded with: ' + (d.error || r.status);
+        status.style.color='#ffaa00';
+        // Still save it if they want
+        localStorage.setItem('pt_worker', val);
+        setTimeout(()=>banner.remove(), 1500);
+      }
+    } catch(e){
+      if(e.message.includes('fetch')){
+        errEl.textContent='Cannot reach that URL. Check the worker is deployed and the URL is correct.';
+      } else {
+        errEl.textContent = e.message;
+      }
+      status.textContent='';
+    }
+  });
 }
 
-// Check on load — show config if URL not set
+// Show config on load if not set
 window.addEventListener('DOMContentLoaded', ()=>{
-  const w = getWorkerUrl();
-  if(!w || w === DEFAULT_WORKER || !w.startsWith('http')) {
-    showConfigBanner();
-  }
+  if(!isConfigured()) showConfigBanner();
 });
 
-// Settings gear — long-press trace btn to reconfigure
+// Long-press TRACE to reconfigure
 let holdTimer;
-tb.addEventListener('touchstart', ()=>{ holdTimer = setTimeout(()=>{ showConfigBanner(); }, 1500); });
+tb.addEventListener('touchstart', ()=>{ holdTimer = setTimeout(()=>showConfigBanner(), 1500); });
 tb.addEventListener('touchend', ()=>clearTimeout(holdTimer));
+tb.addEventListener('mousedown', ()=>{ holdTimer = setTimeout(()=>showConfigBanner(), 1500); });
+tb.addEventListener('mouseup', ()=>clearTimeout(holdTimer));
 
 // Main trace
 async function doTrace(){
-  const number=pi.value.trim();if(!number)return;
+  const number=pi.value.trim(); if(!number)return;
+  if(!isConfigured()){ showConfigBanner('Worker URL not configured'); return; }
   const workerUrl = getWorkerUrl();
-  if(!workerUrl || workerUrl === DEFAULT_WORKER || !workerUrl.startsWith('http')){
-    showConfigBanner(); return;
-  }
   tb.disabled=true;
   ml.textContent=`// SCANNING ${number}...`;
   showLoad();
   try{
-    const res=await fetch(workerUrl,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',max_tokens:1000,system:SYS,
-        tools:[{type:'web_search_20250305',name:'web_search'}],
-        messages:[{role:'user',content:`Research and geolocate this phone number: ${number}`}]
-      })
-    });
-    const data=await res.json();
+    let res;
+    try{
+      res = await fetch(workerUrl,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          model:'claude-sonnet-4-20250514',max_tokens:1000,system:SYS,
+          tools:[{type:'web_search_20250305',name:'web_search'}],
+          messages:[{role:'user',content:`Research and geolocate this phone number: ${number}`}]
+        })
+      });
+    } catch(fetchErr){
+      // Network-level failure — show config with explanation
+      clearInterval(stTimer);
+      showConfigBanner('Failed to reach worker — is it deployed? ' + fetchErr.message);
+      ml.textContent='// TRACE FAILED';
+      tb.disabled=false;
+      return;
+    }
+
+    const data=await res.json().catch(()=>({}));
     clearInterval(stTimer);
-    if(!res.ok)throw new Error(data.error?.message||'API error');
+
+    if(!res.ok){
+      const msg = data.error?.message || data.error || `HTTP ${res.status}`;
+      // If it's an API key problem, show config
+      if(res.status===401||res.status===403||(typeof data.error==='string'&&data.error.includes('API key'))){
+        showConfigBanner('API key error: ' + msg);
+      } else {
+        showErr(msg);
+      }
+      ml.textContent='// TRACE FAILED';
+      tb.disabled=false;
+      return;
+    }
+
     const tb2=data.content?.find(b=>b.type==='text');
-    if(!tb2)throw new Error('No response received');
+    if(!tb2)throw new Error('No text response — check worker is forwarding correctly');
     const parsed=parseResult(tb2.text);
     if(parsed.location?.lat&&parsed.location?.lng){
       placeMarker(parsed.location,parsed.riskLevel);
